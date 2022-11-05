@@ -1,0 +1,5 @@
+test.*
+test_1.*
+.vscode
+.mypycache
+__pycache__
