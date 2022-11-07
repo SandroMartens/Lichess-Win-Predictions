@@ -61,7 +61,7 @@ def write_games(games: list[tuple]) -> None:
     with sqlite3.connect("games2") as con:
         con.execute(
             """
-            CREATE TABLE IF NOT EXISTS 
+            CREATE TABLE IF NOT EXISTS
                 games(
                     url TEXT ,
                     pgn TEXT,
@@ -75,9 +75,9 @@ def write_games(games: list[tuple]) -> None:
 
         con.executemany(
             """
-            INSERT OR IGNORE INTO 
-                games(url, pgn, result, elo_white, elo_black) 
-            VALUES 
+            INSERT OR IGNORE INTO
+                games(url, pgn, result, elo_white, elo_black)
+            VALUES
                 (:url, :pgn, :result, :elo_white, :elo_black)
             """,
             games,
@@ -112,7 +112,7 @@ def write_positions() -> None:
         cur = con.cursor()
         con.execute(
             """
-            CREATE TABLE IF NOT EXISTS 
+            CREATE TABLE IF NOT EXISTS
                 positions(
                     game_id INTEGER,
                     ply  INTEGER NOT NULL,
@@ -124,7 +124,7 @@ def write_positions() -> None:
 
         cur.execute(
             """
-            SELECT rowid as game_id, pgn 
+            SELECT rowid as game_id, pgn
             FROM games
             WHERE game_id NOT IN (
                 SELECT game_id
@@ -137,9 +137,9 @@ def write_positions() -> None:
             positions = [(game_id, fen, ply) for ply, fen in positions]
             con.executemany(
                 """
-                INSERT OR IGNORE INTO 
-                    positions(game_id, fen, ply) 
-                VALUES 
+                INSERT OR IGNORE INTO
+                    positions(game_id, fen, ply)
+                VALUES
                     (:game_id, :fen, :ply)
                 """,
                 (positions),
@@ -158,7 +158,7 @@ def annotate_positions() -> None:
         con.row_factory = dict_factory
         res = con.execute(
             """
-            SELECT 
+            SELECT
                 rowid as position_id, fen
             FROM positions
             WHERE eval IS NULL
@@ -170,25 +170,21 @@ def annotate_positions() -> None:
         ) as engine:
             engine.configure({"Threads": 6, "Use NNUE": True, "Hash": 3000})
             for i, row in enumerate(tqdm(res, unit="positions")):
-                board = chess.Board(row["fen"])
-                evaluation = (
-                    engine.analyse(
-                        board,
-                        chess.engine.Limit(
-                            depth=18,
-                            time=0.5,
-                        ),
-                    )["score"]
-                    .white()
-                    .score(mate_score=10_000)
+                board = chess.Board(fen=row["fen"])
+                evaluation = engine.analyse(
+                    board,
+                    # chess.engine.Limit(depth=18, time=0.5),
+                    chess.engine.Limit(nodes=3_000_000),
                 )
+                cp = evaluation["score"].white().score(mate_score=10_000)
+                # print(evaluation["time"])
                 con.execute(
                     """
-                    UPDATE positions 
-                    SET eval = :eval 
+                    UPDATE positions
+                    SET eval = :eval
                     WHERE rowid = :position_id
                     """,
-                    {"eval": evaluation, "position_id": row["position_id"]},
+                    {"eval": cp, "position_id": row["position_id"]},
                 )
                 # Reduce overhead for commits
                 if i % 100 == 0:
