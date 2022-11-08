@@ -58,7 +58,7 @@ def write_games(games: list[tuple]) -> None:
     """Create a SQL Database with one table games, which has columns
     URL and PGN"""
 
-    with sqlite3.connect("games2") as con:
+    with sqlite3.connect("games2.sqlite") as con:
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS
@@ -108,7 +108,7 @@ def write_positions() -> None:
     move in a new table positions
     """
 
-    with sqlite3.connect("games2") as con:
+    with sqlite3.connect("games2.sqlite") as con:
         cur = con.cursor()
         con.execute(
             """
@@ -154,7 +154,7 @@ def annotate_positions() -> None:
     """Read all positions and run them through stockfish. Write the results
     back to the db."""
 
-    with sqlite3.connect("games2") as con:
+    with sqlite3.connect("games2.sqlite") as con:
         con.row_factory = dict_factory
         res = con.execute(
             """
@@ -173,11 +173,9 @@ def annotate_positions() -> None:
                 board = chess.Board(fen=row["fen"])
                 evaluation = engine.analyse(
                     board,
-                    # chess.engine.Limit(depth=18, time=0.5),
                     chess.engine.Limit(nodes=3_000_000),
                 )
                 cp = evaluation["score"].white().score(mate_score=10_000)
-                # print(evaluation["time"])
                 con.execute(
                     """
                     UPDATE positions
