@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 # %%
 def dict_factory(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict:
-    """Defines how to return a SQL row"""
+    """Defines how to return a SQL row."""
 
     col_names = [col[0] for col in cursor.description]
     return dict(zip(col_names, row))
@@ -56,7 +56,8 @@ def create_dataframe(
 # %%
 def write_games(games: list[tuple]) -> None:
     """Create a SQL Database with one table games, which has columns
-    URL and PGN"""
+    URL and PGN.
+    """
 
     with sqlite3.connect("games2.sqlite") as con:
         con.execute(
@@ -87,7 +88,7 @@ def write_games(games: list[tuple]) -> None:
 
 # %%
 def extract_positions(pgn: str) -> list[tuple[int, str]]:
-    """Take a pgn and return a list of positions (fen) and ply numbers"""
+    """Take a pgn and return a list of positions (fen) and ply numbers."""
 
     game = chess.pgn.read_game(io.StringIO(pgn))
     positions = []
@@ -119,7 +120,8 @@ def write_positions() -> None:
                     fen TEXT,
                     eval REAL,
                     UNIQUE (game_id, ply)
-                )"""
+                )
+            """
         )
 
         cur.execute(
@@ -152,7 +154,8 @@ def write_positions() -> None:
 # %%
 def annotate_positions() -> None:
     """Read all positions and run them through stockfish. Write the results
-    back to the db."""
+    back to the db.
+    """
 
     with sqlite3.connect("games2.sqlite") as con:
         con.row_factory = dict_factory
