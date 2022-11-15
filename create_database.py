@@ -59,7 +59,7 @@ def write_games(games: list[tuple]) -> None:
     URL and PGN.
     """
 
-    with sqlite3.connect("games2.sqlite") as con:
+    with sqlite3.connect("games.sqlite") as con:
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS
@@ -109,7 +109,7 @@ def write_positions() -> None:
     move in a new table positions
     """
 
-    with sqlite3.connect("games2.sqlite") as con:
+    with sqlite3.connect("games.sqlite") as con:
         cur = con.cursor()
         con.execute(
             """
@@ -152,12 +152,12 @@ def write_positions() -> None:
 
 
 # %%
-def annotate_positions() -> None:
+def annotate_positions(engine_path: str) -> None:
     """Read all positions and run them through stockfish. Write the results
     back to the db.
     """
 
-    with sqlite3.connect("games2.sqlite") as con:
+    with sqlite3.connect("games.sqlite") as con:
         con.row_factory = dict_factory
         res = con.execute(
             """
@@ -168,9 +168,7 @@ def annotate_positions() -> None:
             """
         )
 
-        with chess.engine.SimpleEngine.popen_uci(
-            "F:\Downloads\stockfish_15_win_x64_avx2\stockfish_15_x64_avx2.exe"
-        ) as engine:
+        with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
             engine.configure({"Threads": 14, "Use NNUE": True, "Hash": 3000})
             for i, row in enumerate(tqdm(res, unit="positions")):
                 board = chess.Board(fen=row["fen"])
@@ -195,15 +193,16 @@ def annotate_positions() -> None:
 
 # %%
 def main():
-    file_path = "F:\\Dokumente\\git\\schach\\lichess_elite_2022-04.pgn"
+    games_path = "F:\\Dokumente\\git\\schach\\lichess_elite_2022-04.pgn"
+    engine_path = "F:\\Downloads\\stockfish_15_win_x64_avx2\\stockfish_15_x64_avx2.exe"
     n_games = 1050
     df = create_dataframe(
         n_games=n_games,
-        file_path=file_path,
+        file_path=games_path,
     )
     write_games(df)
     write_positions()
-    annotate_positions()
+    annotate_positions(engine_path=engine_path)
 
 
 main()
