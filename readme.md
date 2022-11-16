@@ -8,6 +8,10 @@ Lichess calculates the winning chances using a logistic regression. The winning 
 
 The blogpost claims the exponent is based on real game data. So I downloaded a bunch of pro games and decided to try to reproduce this number. I analyzed over 1000 games with Stockfish and calculated an exponent of $0.0030087$ to solve the logistic regression.
 
+If we plot all positions and their evaluations we can see the following distribution:
+![ply vs eval chart](/images/upload/ply_eval.png)
+At the beginning of the game its unclear. The longer the games goes the more the evaluations tend to be decisive.
+
 ## Methods
 
 The games were parsed and each position fen written in to a database. I then used [Stockfish 15](https://stockfishchess.org/) to evaluate the positions. As search limit was set to three million nodes. This is more than the Lichess server analysis but still runs good on a normal PC. I also saved the Elo of both players and move numbers.
@@ -16,7 +20,7 @@ For the next step I used [scikit-learn](https://scikit-learn.org/stable/index.ht
 
 ## Results
 
-The results are pretty interesting. I got an exponent of $w = 0.0030087$ which is close to the hypothsis. With this setting we have an accuracy of $0.676$.
+The results are pretty interesting. I got an exponent of $w = 0.0030087$ which is close to the hypothsis. With this setting we have an accuracy of $0.676$. The algorithm detects white wins better than black wins.
 
 ![confusion matrix](/images/upload/confusion_matrix.png)
 
@@ -24,8 +28,7 @@ Using different hyperparameters yields highly varying  results. The most importa
 
 Using the elo difference of both players can increase the accuracy to $0.721$.
 
-![ply vs eval chart](/images/upload/ply_eval.png)
-
+The resulting graph is the following:
 ![eval vs winning _chances_chart](/images/upload/eval_winchance.png)
 
 ## Possible Enhancements
