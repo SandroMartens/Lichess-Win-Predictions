@@ -18,15 +18,15 @@ For the next step I used [scikit-learn](https://scikit-learn.org/stable/index.ht
 ## Results
 
 The results are pretty interesting. I got an exponent of $w = 0.0030087$ which is close to the hypothsis. With this setting we have an accuracy of $0.676$.
-![confusion_matrix](images/upload/confusion_matrix.png)
+![confusion matrix](images/upload/confusion_matrix.png)
 
 Using different hyperparameters yields highly varying  results. The most important hyperparameter seem sto be the regularization strength. A low regularization ($10$) gives results close to the expected value. A high regularization ($0.0001$)[^1] gives a coefficient as low as $w = 0.000124$. The accuracy is still $0.676$.
 
 Using the elo difference of both players can increase the accuracy to $0.721$.
 
-![ply_vs_eval_chart](images/upload/ply_eval.png)
+![ply vs eval chart](images/upload/ply_eval.png)
 
-![eval_vs_winning_chances_chart](images/upload/eval_winchance.png)
+![eval vs winning _chances_chart](images/upload/eval_winchance.png)
 
 ## Possible Enhancements
 
