@@ -4,10 +4,9 @@
 
 In this notebook I want to show how you can calculate the win probability of a chess player given the engone evaluation of the position. This was to reproduce the numbers in [this](https://lichess.org/page/accuracy) post. Converting an engine evaluation to a winning chance is useful because it considers how effective humans convert a position compared to an engine.
 
-Lichess calculates the winning chances using a logistic regression. The winning chance of the White player is calculated as $p(white\ win) = 50 + 50 * (2 / (1 + e ^ {(-0.00368208\ *\ centipawns)}) - 1)$.
+Lichess calculates the winning chances using a logistic regression. The winning chance of the White player is calculated as $p(white\ win) = 50 + 50 *(2 / (1 + e ^ {(-0.00368208* centipawns)}) - 1)$.
 
 The blogpost claims the exponent is based on real game data. So I downloaded a bunch of pro games and decided to try to reproduce this number. I analyzed over 1000 games with Stockfish and calculated an exponent of $0.0030087$ to solve the logistic regression.
-
 
 ## Methods
 
@@ -18,6 +17,7 @@ For the next step I used [scikit-learn](https://scikit-learn.org/stable/index.ht
 ## Results
 
 The results are pretty interesting. I got an exponent of $w = 0.0030087$ which is close to the hypothsis. With this setting we have an accuracy of $0.676$.
+
 ![confusion matrix](/images/upload/confusion_matrix.png)
 
 Using different hyperparameters yields highly varying  results. The most important hyperparameter seem sto be the regularization strength. A low regularization ($10$) gives results close to the expected value. A high regularization ($0.0001$)[^1] gives a coefficient as low as $w = 0.000124$. The accuracy is still $0.676$.
