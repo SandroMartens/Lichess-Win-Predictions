@@ -27,7 +27,7 @@ The results are pretty interesting. I got an exponent of $w = 0.0030087$ which i
 The function is the following:
 ![eval vs winning _chances_chart](/images/upload/eval_winchance.png)
 
-Using different hyperparameters yields highly varying results. The most important hyperparameter seems to be the regularization strength. A low regularization ($10$) gives results close to the expected value. A high regularization ($0.0001$)[^1] gives a coefficient as low as $w = 0.000124$. The accuracy is still $0.676$. Since regularization prevents against overfitting it seems that the model is actually overfit with this parameter.
+Using different hyperparameters yields highly varying results. The most important hyperparameter seems to be the regularization strength. A low regularization ( $10$ ) gives results close to the expected value. A high regularization ( $0.0001$ )[^1] gives a coefficient as low as $w = 0.000124$. The accuracy is still $0.676$. Since regularization prevents against overfitting it seems that the model is actually overfit with this parameter.
 
 Using the elo difference of both players can increase the accuracy to $0.721$.
 
