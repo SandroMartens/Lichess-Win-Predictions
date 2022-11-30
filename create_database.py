@@ -169,7 +169,9 @@ def annotate_positions(engine_path: str) -> None:
         )
 
         with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
-            engine.configure({"Threads": 14, "Use NNUE": True, "Hash": 3000})
+            engine.configure(
+                {"Threads": 12, "Use NNUE": True, "Hash": 3000}
+            )
             for i, row in enumerate(tqdm(res, unit="positions")):
                 board = chess.Board(fen=row["fen"])
                 evaluation = engine.analyse(
@@ -195,7 +197,7 @@ def annotate_positions(engine_path: str) -> None:
 def main():
     games_path = "F:\\Dokumente\\git\\schach\\lichess_elite_2022-04.pgn"
     engine_path = "F:\\Downloads\\stockfish_15_win_x64_avx2\\stockfish_15_x64_avx2.exe"
-    n_games = 1050
+    n_games = 2000
     df = create_dataframe(
         n_games=n_games,
         file_path=games_path,
