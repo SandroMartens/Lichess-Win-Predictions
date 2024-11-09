@@ -213,7 +213,7 @@ def main():
         "stockfish-windows-x86-64-avx2\\stockfish\\stockfish-windows-x86-64-avx2.exe"
     )
     lc0_path = "..\\lc0-v0.31.2-windows-gpu-nvidia-cuda\\lc0.exe"
-    n_games = 100
+    n_games = 1000
     df = create_dataframe(
         n_games=n_games,
         file_path=games_path,
