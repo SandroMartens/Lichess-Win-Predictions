@@ -119,6 +119,9 @@ def write_positions() -> None:
                     ply  INTEGER NOT NULL,
                     fen TEXT,
                     eval REAL,
+                    win_chance FLOAT,
+                    lose_chance FLOAT,
+                    draw_chance FLOAT,
                     UNIQUE (game_id, ply)
                 )
             """
@@ -169,21 +172,33 @@ def annotate_positions(engine_path: str) -> None:
         )
 
         with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
-            engine.configure({"Threads": 14, "Use NNUE": True, "Hash": 3000})
+            engine.configure({"Threads": 14, "UCI_ShowWDL": True})
             for i, row in enumerate(tqdm(res, unit="positions")):
                 board = chess.Board(fen=row["fen"])
-                evaluation = engine.analyse(
-                    board,
-                    chess.engine.Limit(nodes=3_000_000),
-                )
-                cp = evaluation["score"].white().score(mate_score=10_000)
+                if not board.is_checkmate():
+                    evaluation = engine.analyse(
+                        board,
+                        chess.engine.Limit(time=0.05),
+                    )
+                    cp = evaluation["score"].white().score(mate_score=10_000)
+                    win_chance, draw_chance, lose_chance = evaluation["wdl"].relative
                 con.execute(
                     """
                     UPDATE positions
-                    SET eval = :eval
+                    SET 
+                        eval = :eval,
+                        win_chance = :win_chance,
+                        draw_chance = :draw_chance,
+                        lose_chance = :lose_chance
                     WHERE rowid = :position_id
                     """,
-                    {"eval": cp, "position_id": row["position_id"]},
+                    {
+                        "eval": cp,
+                        "position_id": row["position_id"],
+                        "win_chance": win_chance / 1000,
+                        "draw_chance": draw_chance / 1000,
+                        "lose_chance": lose_chance / 1000,
+                    },
                 )
                 # Reduce overhead for commits
                 if i % 100 == 0:
@@ -193,16 +208,19 @@ def annotate_positions(engine_path: str) -> None:
 
 # %%
 def main():
-    games_path = "F:\\Dokumente\\git\\schach\\lichess_elite_2022-04.pgn"
-    engine_path = "F:\\Downloads\\stockfish_15_win_x64_avx2\\stockfish_15_x64_avx2.exe"
-    n_games = 1050
+    games_path = "..\\lichess_elite_2022-04.pgn"
+    stockfish_path = (
+        "stockfish-windows-x86-64-avx2\\stockfish\\stockfish-windows-x86-64-avx2.exe"
+    )
+    lc0_path = "..\\lc0-v0.31.2-windows-gpu-nvidia-cuda\\lc0.exe"
+    n_games = 100
     df = create_dataframe(
         n_games=n_games,
         file_path=games_path,
     )
     write_games(df)
     write_positions()
-    annotate_positions(engine_path=engine_path)
+    annotate_positions(engine_path=lc0_path)
 
 
 main()
