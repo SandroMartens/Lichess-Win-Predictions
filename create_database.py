@@ -54,12 +54,12 @@ def create_dataframe(
 
 
 # %%
-def write_games(games: list[tuple]) -> None:
+def write_games(games: list[tuple], db_path: str) -> None:
     """Create a SQL Database with one table games, which has columns
     URL and PGN.
     """
 
-    with sqlite3.connect("games.sqlite") as con:
+    with sqlite3.connect(db_path) as con:
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS
@@ -104,12 +104,12 @@ def extract_positions(pgn: str) -> list[tuple[int, str]]:
 
 
 # %%
-def write_positions() -> None:
+def write_positions(db_path: str) -> None:
     """Read the pgn from the games table and write the fen and ply of each
     move in a new table positions
     """
 
-    with sqlite3.connect("games.sqlite") as con:
+    with sqlite3.connect(db_path) as con:
         cur = con.cursor()
         con.execute(
             """
@@ -123,6 +123,13 @@ def write_positions() -> None:
                 )
             """
         )
+        # ponytail: naive add-column-if-missing, needed since games.sqlite
+        # predates these columns. Swap for a real migration if schema churns.
+        for column in ("win_chance", "lose_chance", "draw_chance"):
+            try:
+                con.execute(f"ALTER TABLE positions ADD COLUMN {column} FLOAT")
+            except sqlite3.OperationalError:
+                pass
 
         cur.execute(
             """
@@ -152,12 +159,17 @@ def write_positions() -> None:
 
 
 # %%
-def annotate_positions(engine_path: str) -> None:
-    """Read all positions and run them through stockfish. Write the results
-    back to the db.
+def annotate_positions(
+    engine_path: str,
+    db_path: str,
+    engine_options: dict,
+    limit: chess.engine.Limit,
+) -> None:
+    """Read all positions and run them through the given UCI engine. Write
+    the eval and WDL chances back to the db.
     """
 
-    with sqlite3.connect("games.sqlite") as con:
+    with sqlite3.connect(db_path) as con:
         con.row_factory = dict_factory
         res = con.execute(
             """
@@ -169,23 +181,31 @@ def annotate_positions(engine_path: str) -> None:
         )
 
         with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
-            engine.configure(
-                {"Threads": 12, "Use NNUE": True, "Hash": 3000}
-            )
+            engine.configure({**engine_options, "UCI_ShowWDL": True})
             for i, row in enumerate(tqdm(res, unit="positions")):
                 board = chess.Board(fen=row["fen"])
-                evaluation = engine.analyse(
-                    board,
-                    chess.engine.Limit(nodes=3_000_000),
-                )
+                if board.is_checkmate():
+                    continue
+                evaluation = engine.analyse(board, limit)
                 cp = evaluation["score"].white().score(mate_score=10_000)
+                win_chance, draw_chance, lose_chance = evaluation["wdl"].relative
                 con.execute(
                     """
                     UPDATE positions
-                    SET eval = :eval
+                    SET
+                        eval = :eval,
+                        win_chance = :win_chance,
+                        draw_chance = :draw_chance,
+                        lose_chance = :lose_chance
                     WHERE rowid = :position_id
                     """,
-                    {"eval": cp, "position_id": row["position_id"]},
+                    {
+                        "eval": cp,
+                        "position_id": row["position_id"],
+                        "win_chance": win_chance / 1000,
+                        "draw_chance": draw_chance / 1000,
+                        "lose_chance": lose_chance / 1000,
+                    },
                 )
                 # Reduce overhead for commits
                 if i % 100 == 0:
@@ -195,16 +215,35 @@ def annotate_positions(engine_path: str) -> None:
 
 # %%
 def main():
-    games_path = "F:\\Dokumente\\git\\schach\\lichess_elite_2022-04.pgn"
-    engine_path = "F:\\Downloads\\stockfish_15_win_x64_avx2\\stockfish_15_x64_avx2.exe"
+    games_path = "..\\lichess_elite_2022-04.pgn"
+    stockfish_path = (
+        "stockfish-windows-x86-64-avx2\\stockfish\\stockfish-windows-x86-64-avx2.exe"
+    )
+    lc0_path = "..\\lc0-v0.31.2-windows-gpu-nvidia-cuda\\lc0.exe"
     n_games = 2000
+
     df = create_dataframe(
         n_games=n_games,
         file_path=games_path,
     )
-    write_games(df)
-    write_positions()
-    annotate_positions(engine_path=engine_path)
+
+    write_games(df, db_path="games.sqlite")
+    write_positions(db_path="games.sqlite")
+    annotate_positions(
+        engine_path=stockfish_path,
+        db_path="games.sqlite",
+        engine_options={"Threads": 12, "Use NNUE": True, "Hash": 3000},
+        limit=chess.engine.Limit(nodes=3_000_000),
+    )
+
+    write_games(df, db_path="games_leela.sqlite")
+    write_positions(db_path="games_leela.sqlite")
+    annotate_positions(
+        engine_path=lc0_path,
+        db_path="games_leela.sqlite",
+        engine_options={"Threads": 14},
+        limit=chess.engine.Limit(time=0.05),
+    )
 
 
 main()
