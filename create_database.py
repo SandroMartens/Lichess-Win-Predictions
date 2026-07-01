@@ -54,12 +54,12 @@ def create_dataframe(
 
 
 # %%
-def write_games(games: list[tuple]) -> None:
+def write_games(games: list[tuple], db_path: str) -> None:
     """Create a SQL Database with one table games, which has columns
     URL and PGN.
     """
 
-    with sqlite3.connect("games.sqlite") as con:
+    with sqlite3.connect(db_path) as con:
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS
@@ -104,12 +104,12 @@ def extract_positions(pgn: str) -> list[tuple[int, str]]:
 
 
 # %%
-def write_positions() -> None:
+def write_positions(db_path: str) -> None:
     """Read the pgn from the games table and write the fen and ply of each
     move in a new table positions
     """
 
-    with sqlite3.connect("games.sqlite") as con:
+    with sqlite3.connect(db_path) as con:
         cur = con.cursor()
         con.execute(
             """
@@ -119,13 +119,17 @@ def write_positions() -> None:
                     ply  INTEGER NOT NULL,
                     fen TEXT,
                     eval REAL,
-                    win_chance FLOAT,
-                    lose_chance FLOAT,
-                    draw_chance FLOAT,
                     UNIQUE (game_id, ply)
                 )
             """
         )
+        # ponytail: naive add-column-if-missing, needed since games.sqlite
+        # predates these columns. Swap for a real migration if schema churns.
+        for column in ("win_chance", "lose_chance", "draw_chance"):
+            try:
+                con.execute(f"ALTER TABLE positions ADD COLUMN {column} FLOAT")
+            except sqlite3.OperationalError:
+                pass
 
         cur.execute(
             """
@@ -155,12 +159,17 @@ def write_positions() -> None:
 
 
 # %%
-def annotate_positions(engine_path: str) -> None:
-    """Read all positions and run them through stockfish. Write the results
-    back to the db.
+def annotate_positions(
+    engine_path: str,
+    db_path: str,
+    engine_options: dict,
+    limit: chess.engine.Limit,
+) -> None:
+    """Read all positions and run them through the given UCI engine. Write
+    the eval and WDL chances back to the db.
     """
 
-    with sqlite3.connect("games.sqlite") as con:
+    with sqlite3.connect(db_path) as con:
         con.row_factory = dict_factory
         res = con.execute(
             """
@@ -172,20 +181,18 @@ def annotate_positions(engine_path: str) -> None:
         )
 
         with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
-            engine.configure({"Threads": 14, "UCI_ShowWDL": True})
+            engine.configure({**engine_options, "UCI_ShowWDL": True})
             for i, row in enumerate(tqdm(res, unit="positions")):
                 board = chess.Board(fen=row["fen"])
-                if not board.is_checkmate():
-                    evaluation = engine.analyse(
-                        board,
-                        chess.engine.Limit(time=0.05),
-                    )
-                    cp = evaluation["score"].white().score(mate_score=10_000)
-                    win_chance, draw_chance, lose_chance = evaluation["wdl"].relative
+                if board.is_checkmate():
+                    continue
+                evaluation = engine.analyse(board, limit)
+                cp = evaluation["score"].white().score(mate_score=10_000)
+                win_chance, draw_chance, lose_chance = evaluation["wdl"].relative
                 con.execute(
                     """
                     UPDATE positions
-                    SET 
+                    SET
                         eval = :eval,
                         win_chance = :win_chance,
                         draw_chance = :draw_chance,
@@ -213,14 +220,30 @@ def main():
         "stockfish-windows-x86-64-avx2\\stockfish\\stockfish-windows-x86-64-avx2.exe"
     )
     lc0_path = "..\\lc0-v0.31.2-windows-gpu-nvidia-cuda\\lc0.exe"
-    n_games = 1000
+    n_games = 2000
+
     df = create_dataframe(
         n_games=n_games,
         file_path=games_path,
     )
-    write_games(df)
-    write_positions()
-    annotate_positions(engine_path=lc0_path)
+
+    write_games(df, db_path="games.sqlite")
+    write_positions(db_path="games.sqlite")
+    annotate_positions(
+        engine_path=stockfish_path,
+        db_path="games.sqlite",
+        engine_options={"Threads": 12, "Use NNUE": True, "Hash": 3000},
+        limit=chess.engine.Limit(nodes=3_000_000),
+    )
+
+    write_games(df, db_path="games_leela.sqlite")
+    write_positions(db_path="games_leela.sqlite")
+    annotate_positions(
+        engine_path=lc0_path,
+        db_path="games_leela.sqlite",
+        engine_options={"Threads": 14},
+        limit=chess.engine.Limit(time=0.05),
+    )
 
 
 main()
