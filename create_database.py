@@ -9,14 +9,6 @@ from tqdm import tqdm
 
 
 # %%
-def dict_factory(cursor: sqlite3.Cursor, row: sqlite3.Row) -> dict:
-    """Defines how to return a SQL row."""
-
-    col_names = [col[0] for col in cursor.description]
-    return dict(zip(col_names, row))
-
-
-# %%
 def create_dataframe(
     n_games: int, file_path: str
 ) -> list[tuple[str, str, int, int, int]]:
@@ -170,7 +162,7 @@ def annotate_positions(
     """
 
     with sqlite3.connect(db_path) as con:
-        con.row_factory = dict_factory
+        con.row_factory = sqlite3.Row
         res = con.execute(
             """
             SELECT
